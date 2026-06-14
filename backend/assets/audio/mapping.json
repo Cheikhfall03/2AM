@@ -1,0 +1,62 @@
+{
+  "person": {
+    "label_fr": "personne",
+    "phrase_wolof": "Nit ci kanam",
+    "audio_file": "person.wav",
+    "enabled": true
+  },
+  "car": {
+    "label_fr": "voiture",
+    "phrase_wolof": "Oto bi",
+    "audio_file": "car.wav",
+    "enabled": true
+  },
+  "bicycle": {
+    "label_fr": "vélo",
+    "phrase_wolof": "Velo bi",
+    "audio_file": "bicycle.wav",
+    "enabled": true
+  },
+  "chair": {
+    "label_fr": "chaise",
+    "phrase_wolof": "Siis bi",
+    "audio_file": "chair.wav",
+    "enabled": true
+  },
+  "dog": {
+    "label_fr": "chien",
+    "phrase_wolof": "Xaj bi",
+    "audio_file": "dog.wav",
+    "enabled": true
+  },
+  "bench": {
+    "label_fr": "banc",
+    "phrase_wolof": "Banq bi",
+    "audio_file": "bench.wav",
+    "enabled": true
+  },
+  "bottle": {
+    "label_fr": "bouteille",
+    "phrase_wolof": "Buteyu bi",
+    "audio_file": "bottle.wav",
+    "enabled": true
+  },
+  "stop sign": {
+    "label_fr": "panneau stop",
+    "phrase_wolof": "Panoo stop",
+    "audio_file": "stop_sign.wav",
+    "enabled": true
+  },
+  "traffic light": {
+    "label_fr": "feu tricolore",
+    "phrase_wolof": "Feu bi",
+    "audio_file": "traffic_light.wav",
+    "enabled": true
+  },
+  "backpack": {
+    "label_fr": "sac à dos",
+    "phrase_wolof": "Sac bi",
+    "audio_file": "backpack.wav",
+    "enabled": true
+  }
+}

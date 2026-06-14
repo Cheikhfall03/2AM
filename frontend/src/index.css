@@ -1,0 +1,104 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* Surfaces */
+  --bg-base:     #080810;
+  --bg-card:     #10101C;
+  --bg-raised:   #18182A;
+  --bg-input:    #1E1E30;
+
+  /* Borders */
+  --border:      #252538;
+  --border-mid:  #32324A;
+
+  /* Text */
+  --text-1:      #EEEEF8;
+  --text-2:      #9090B0;
+  --text-3:      #55556C;
+
+  /* Accent — amber (street‑light, nocturnal warmth) */
+  --amber:       #F59E0B;
+  --amber-dim:   rgba(245,158,11,.12);
+  --amber-glow:  rgba(245,158,11,.25);
+
+  /* Semantic */
+  --green:       #22C55E;
+  --green-dim:   rgba(34,197,94,.12);
+  --red:         #EF4444;
+  --red-dim:     rgba(239,68,68,.12);
+  --blue:        #6366F1;
+  --blue-dim:    rgba(99,102,241,.12);
+
+  /* Geometry */
+  --r-sm:  4px;
+  --r-md:  8px;
+  --r-lg:  12px;
+  --r-xl:  16px;
+
+  /* Motion */
+  --ease: cubic-bezier(.4,0,.2,1);
+}
+
+html {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 15px;
+  -webkit-text-size-adjust: 100%;
+  background: var(--bg-base);
+  color: var(--text-1);
+}
+
+body {
+  min-height: 100dvh;
+  max-width: 480px;
+  margin: 0 auto;
+  background: var(--bg-base);
+  overscroll-behavior: none;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+/* ── Utils ── */
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: inherit;
+}
+button:disabled { opacity: .4; cursor: not-allowed; }
+
+/* ── Badge ── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+}
+.badge-green  { background: var(--green-dim); color: var(--green); }
+.badge-red    { background: var(--red-dim);   color: var(--red);   }
+.badge-amber  { background: var(--amber-dim); color: var(--amber); }
+.badge-muted  { background: var(--bg-raised); color: var(--text-3);}
+.badge::before { content: ''; display: block; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+/* ── Divider ── */
+.divider {
+  height: 1px;
+  background: var(--border);
+  border: none;
+}
