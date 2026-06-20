@@ -1,82 +1,30 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Header from '../components/Header'
-import { audioUrl, detect } from '../api'
-
-function resolveAudio(announcement) {
-  if (!announcement) return null
-  return announcement.audio_url ? audioUrl(announcement.label) : null
-}
+import { describe } from '../api'
 import './Live.css'
 
 const SESSION_ID = `session-${Date.now()}`
-const POSITION_LABELS = { left: 'Gauche', center: 'Centre', right: 'Droite' }
 
-function AnnouncementBanner({ announcement, onDismiss, audioCtx }) {
-  const sourceRef = useRef(null)
+async function playBlob(ctx, blob) {
+  if (!ctx || ctx.state === 'closed') return
+  try {
+    const buf     = await blob.arrayBuffer()
+    const decoded = await ctx.decodeAudioData(buf)
+    const src     = ctx.createBufferSource()
+    src.buffer    = decoded
+    src.connect(ctx.destination)
+    src.start(0)
+  } catch { /* audio non jouable — silencieux */ }
+}
 
-  useEffect(() => {
-    const url = resolveAudio(announcement)
-    if (!url) return
-    let cancelled = false
-
-    async function playAudio() {
-      try {
-        // Méthode 1 : AudioContext (contourne l'autoplay mobile)
-        if (audioCtx?.state !== 'closed') {
-          const res = await fetch(url)
-          const buf = await res.arrayBuffer()
-          if (cancelled) return
-          const decoded = await audioCtx.decodeAudioData(buf)
-          if (cancelled) return
-          if (sourceRef.current) sourceRef.current.disconnect()
-          const src = audioCtx.createBufferSource()
-          src.buffer = decoded
-          src.connect(audioCtx.destination)
-          src.start(0)
-          sourceRef.current = src
-          return
-        }
-      } catch { /* fallback */ }
-      // Méthode 2 : HTMLAudioElement classique
-      const a = new Audio(url)
-      a.play().catch(() => {})
-    }
-
-    playAudio()
-    return () => { cancelled = true; if (sourceRef.current) sourceRef.current.disconnect() }
-  }, [announcement, audioCtx])
-
-  if (!announcement) return null
-
-  const dist = announcement.distance_m
-  const urgency = dist !== null && dist <= 2 ? 'urgent' : dist !== null && dist <= 4 ? 'warn' : 'info'
-
+function AnnouncementBanner({ scene, onDismiss }) {
+  if (!scene) return null
+  const urgent = scene.phraseFr.startsWith('Attention')
   return (
-    <div className={`announcement announcement-${urgency}`} role="alert" aria-live="assertive">
+    <div className={`announcement announcement-${urgent ? 'urgent' : 'info'}`} role="alert" aria-live="assertive">
       <div className="announcement-main">
-        <span className="announcement-phrase">{announcement.phrase_wolof}</span>
-        <span className="announcement-label">{announcement.label_fr}</span>
-      </div>
-      <div className="announcement-meta">
-        {dist !== null && (
-          <span className="announcement-dist">
-            {dist.toFixed(1)} m
-          </span>
-        )}
-        <span className="announcement-pos">
-          {POSITION_LABELS[announcement.position] ?? announcement.position}
-        </span>
-        {announcement.audio_url && (
-          <button
-            className="announcement-replay"
-            onClick={() => { const a = new Audio(resolveAudio(announcement)); a.play().catch(() => {}) }}
-            aria-label="Rejouer l'annonce"
-          >
-            <svg viewBox="0 0 20 20" fill="currentColor">
-              <path d="M6.3 2.84A1.5 1.5 0 0 0 4 4.11v11.78a1.5 1.5 0 0 0 2.3 1.27l9.344-5.891a1.5 1.5 0 0 0 0-2.538L6.3 2.84Z" />
-            </svg>
-          </button>
-        )}
+        <span className="announcement-phrase">{scene.phraseWo}</span>
+        <span className="announcement-label">{scene.phraseFr}</span>
       </div>
       <button className="announcement-close" onClick={onDismiss} aria-label="Fermer">
         <svg viewBox="0 0 20 20" fill="currentColor">
@@ -87,24 +35,6 @@ function AnnouncementBanner({ announcement, onDismiss, audioCtx }) {
   )
 }
 
-function DetectionRow({ det }) {
-  const dist = det.distance_m
-  const urgency = dist !== null && dist <= 2 ? 'urgent' : dist !== null && dist <= 4 ? 'warn' : 'ok'
-  return (
-    <div className={`det-row det-row-${urgency}`}>
-      <div className="det-info">
-        <span className="det-label">{det.label_fr}</span>
-        <span className="det-pos">{POSITION_LABELS[det.position] ?? det.position}</span>
-      </div>
-      <div className="det-right">
-        {dist !== null && <span className="det-dist">{dist.toFixed(1)} m</span>}
-        <span className="det-conf">{(det.confidence * 100).toFixed(0)}%</span>
-      </div>
-    </div>
-  )
-}
-
-// Silence base64 WAV (1 frame) pour déverrouiller l'audio mobile
 const SILENCE = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA='
 
 export default function Live() {
@@ -114,13 +44,11 @@ export default function Live() {
   const intervalRef = useRef(null)
   const audioCtxRef = useRef(null)
 
-  const [cameraOn,      setCameraOn]      = useState(false)
-  const [auto,          setAuto]          = useState(false)
-  const [detecting,     setDetecting]     = useState(false)
-  const [announcement,  setAnnouncement]  = useState(null)
-  const [detections,    setDetections]    = useState([])
-  const [scene,         setScene]         = useState(null)
-  const [error,         setError]         = useState(null)
+  const [cameraOn,   setCameraOn]   = useState(false)
+  const [auto,       setAuto]       = useState(false)
+  const [detecting,  setDetecting]  = useState(false)
+  const [scene,      setScene]      = useState(null)  // { phraseFr, phraseWo, audioBlob }
+  const [error,      setError]      = useState(null)
 
   /* ── Déverrouillage audio mobile (geste utilisateur requis) ── */
   const unlockAudio = useCallback(() => {
@@ -159,8 +87,6 @@ export default function Live() {
     streamRef.current = null
     setCameraOn(false)
     setAuto(false)
-    setDetections([])
-    setAnnouncement(null)
     setScene(null)
   }, [])
 
@@ -184,10 +110,11 @@ export default function Live() {
     try {
       const blob = await captureFrame()
       if (!blob) return
-      const result = await detect(blob, SESSION_ID)
-      setDetections(result.detections ?? [])
-      setScene(result.scene ?? null)
-      if (result.announcement) setAnnouncement(result.announcement)
+      const result = await describe(blob, SESSION_ID)
+      if (result) {
+        setScene(result)
+        playBlob(audioCtxRef.current, result.audioBlob)
+      }
     } catch {
       setError('Erreur de détection. Le backend est-il démarré ?')
     } finally {
@@ -211,11 +138,12 @@ export default function Live() {
         const blob = await captureFrame()
         if (!blob || !active) break
         try {
-          const result = await detect(blob, SESSION_ID)
+          const result = await describe(blob, SESSION_ID)
           if (!active) break
-          setDetections(result.detections ?? [])
-          setScene(result.scene ?? null)
-          if (result.announcement) setAnnouncement(result.announcement)
+          if (result) {
+            setScene(result)
+            playBlob(audioCtxRef.current, result.audioBlob)
+          }
           setError(null)
         } catch {
           if (!active) break
@@ -235,11 +163,7 @@ export default function Live() {
     <div className="live-page">
       <Header title="Détection" />
 
-      <AnnouncementBanner
-        announcement={announcement}
-        onDismiss={() => setAnnouncement(null)}
-        audioCtx={audioCtxRef.current}
-      />
+      <AnnouncementBanner scene={scene} onDismiss={() => setScene(null)} />
 
       {/* Camera viewport */}
       <div className="viewport">
@@ -327,22 +251,9 @@ export default function Live() {
         </div>
       )}
 
-      {/* Detections list */}
-      {detections.length > 0 && (
-        <section className="detections-section">
-          <div className="section-header">
-            <span className="section-title">Objets détectés</span>
-            <span className="badge badge-amber">{detections.length}</span>
-          </div>
-          <div className="det-list">
-            {detections.map((d, i) => <DetectionRow key={i} det={d} />)}
-          </div>
-        </section>
-      )}
-
-      {scene && scene.object_count === 0 && (
+      {!scene && cameraOn && !detecting && (
         <div className="live-empty">
-          <span>Aucun objet détecté</span>
+          <span>En attente d'objets…</span>
         </div>
       )}
     </div>

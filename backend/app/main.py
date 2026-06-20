@@ -4,9 +4,13 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 
 from app.audio_registry import AudioRegistry
+from app.florence_service import FlorenceService
+from app.nmt_service import WolofTranslator
+from app.tts_service import WolofTTS
+from app.scene_narrator import describe_to_audio
 from app.schemas import (
     AudioMappingEntry,
     AudioMappingUpdate,
@@ -21,7 +25,9 @@ detection_service = DetectionService(registry)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    detection_service.ensure_model()  # charge YOLO en mémoire au démarrage
+    FlorenceService.get()   # précharge Florence-2 sur GPU
+    WolofTranslator.get()   # précharge NLLB sur GPU
+    WolofTTS.get()          # précharge MMS TTS sur GPU
     yield
 
 
@@ -121,3 +127,34 @@ async def detect_image(
         raise HTTPException(400, str(exc)) from exc
     except Exception as exc:
         raise HTTPException(500, f"Erreur de détection: {exc}") from exc
+
+
+@app.post("/api/v1/describe")
+async def describe_scene(
+    file: UploadFile = File(...),
+    session_id: str = Query(default="default"),
+):
+    """
+    Pipeline Florence-2 :
+    frame → Florence-2 (description EN) → NLLB (Wolof) → MMS TTS → audio WAV
+    Cache LRU sur les traductions et synthèses pour les scènes répétées.
+    """
+    content = await file.read()
+    if not content:
+        raise HTTPException(400, "Image vide")
+    try:
+        output = describe_to_audio(content)
+        if output is None:
+            return Response(status_code=204)
+
+        caption_en, phrase_wo, audio_bytes = output
+        return Response(
+            content=audio_bytes,
+            media_type="audio/wav",
+            headers={
+                "X-Phrase-EN": caption_en,
+                "X-Phrase-WO": phrase_wo,
+            },
+        )
+    except Exception as exc:
+        raise HTTPException(500, str(exc)) from exc
