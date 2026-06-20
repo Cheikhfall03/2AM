@@ -7,7 +7,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 
 from app.audio_registry import AudioRegistry
-from app.florence_service import FlorenceService
 from app.nmt_service import WolofTranslator
 from app.tts_service import WolofTTS
 from app.scene_narrator import describe_to_audio
@@ -25,9 +24,9 @@ detection_service = DetectionService(registry)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    FlorenceService.get()   # précharge Florence-2 sur GPU
-    WolofTranslator.get()   # précharge NLLB sur GPU
-    WolofTTS.get()          # précharge MMS TTS sur GPU
+    detection_service.ensure_model()  # précharge YOLO sur GPU
+    WolofTranslator.get()             # précharge NLLB sur GPU
+    WolofTTS.get()                    # précharge MMS TTS sur GPU
     yield
 
 
@@ -135,24 +134,24 @@ async def describe_scene(
     session_id: str = Query(default="default"),
 ):
     """
-    Pipeline Florence-2 :
-    frame → Florence-2 (description EN) → NLLB (Wolof) → MMS TTS → audio WAV
-    Cache LRU sur les traductions et synthèses pour les scènes répétées.
+    Pipeline YOLO :
+    frame → YOLO → phrase FR → NLLB (Wolof) → MMS TTS → audio WAV
     """
     content = await file.read()
     if not content:
         raise HTTPException(400, "Image vide")
     try:
-        output = describe_to_audio(content)
+        result = detection_service.process_bytes(content, session_id=session_id)
+        output = describe_to_audio(result.detections)
         if output is None:
             return Response(status_code=204)
 
-        caption_en, phrase_wo, audio_bytes = output
+        phrase_fr, phrase_wo, audio_bytes = output
         return Response(
             content=audio_bytes,
             media_type="audio/wav",
             headers={
-                "X-Phrase-EN": caption_en,
+                "X-Phrase-FR": phrase_fr,
                 "X-Phrase-WO": phrase_wo,
             },
         )
