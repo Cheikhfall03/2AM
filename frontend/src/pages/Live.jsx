@@ -195,7 +195,13 @@ export default function Live() {
     }
   }, [detecting, captureFrame])
 
-  /* ── Boucle live : enchaîne les détections sans délai fixe ── */
+  /* ── Keep-alive : ping toutes les 9 min pour garder Render éveillé ── */
+  useEffect(() => {
+    const id = setInterval(() => fetch('https://twoam.onrender.com/health').catch(() => {}), 9 * 60 * 1000)
+    return () => clearInterval(id)
+  }, [])
+
+  /* ── Boucle live : enchaîne les détections, réessaie en cas d'erreur ── */
   useEffect(() => {
     if (!auto || !cameraOn) return
     let active = true
@@ -212,8 +218,9 @@ export default function Live() {
           if (result.announcement) setAnnouncement(result.announcement)
           setError(null)
         } catch {
-          if (active) setError('Erreur de détection. Le backend est-il démarré ?')
-          break
+          if (!active) break
+          setError('Connexion au backend en cours...')
+          await new Promise(r => setTimeout(r, 3000))
         }
       }
       setDetecting(false)
