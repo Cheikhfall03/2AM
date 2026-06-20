@@ -11,7 +11,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app/ ./app/
 COPY assets/ ./assets/
-COPY yolo11n.pt .
+
+# Télécharge le modèle YOLO au build (évite le téléchargement au 1er appel)
+RUN python -c "from ultralytics import YOLO; YOLO('yolo11n.pt')"
 
 ENV PYTHONPATH=/app
 ENV PORT=8001
