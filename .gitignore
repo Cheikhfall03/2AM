@@ -13,5 +13,10 @@ dist/
 # OS
 .DS_Store
 
+# Modèles et fichiers lourds
+*.pt
+*.mp4
+*.avi
+
 # Secrets (ne jamais committer)
 .env.production.local
