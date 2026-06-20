@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse, Response
 from app.audio_registry import AudioRegistry
 from app.nmt_service import WolofTranslator
 from app.tts_service import WolofTTS
-from app.scene_narrator import build_scene_phrase
+from app.scene_narrator import describe_to_audio
 from app.schemas import (
     AudioMappingEntry,
     AudioMappingUpdate,
@@ -133,23 +133,28 @@ async def describe_scene(
     file: UploadFile = File(...),
     session_id: str = Query(default="default"),
 ):
-    """Détecte → génère phrase française → traduit en Wolof → retourne audio WAV."""
+    """
+    Pipeline complet :
+    frame → YOLO → phrase FR → NLLB (Wolof) → SpeechT5 → audio WAV
+    Cache LRU sur les traductions et synthèses pour les scènes répétées.
+    """
     content = await file.read()
     if not content:
         raise HTTPException(400, "Image vide")
     try:
         result = detection_service.process_bytes(content, session_id=session_id)
-        phrase_fr = build_scene_phrase(result.detections)
-        if not phrase_fr:
-            return Response(status_code=204)  # rien à dire
+        output = describe_to_audio(result.detections)
+        if output is None:
+            return Response(status_code=204)
 
-        phrase_wo = WolofTranslator.get().translate(phrase_fr)
-        audio_bytes = WolofTTS.get().synthesize(phrase_wo)
-
+        phrase_fr, phrase_wo, audio_bytes = output
         return Response(
             content=audio_bytes,
             media_type="audio/wav",
-            headers={"X-Phrase-FR": phrase_fr, "X-Phrase-WO": phrase_wo},
+            headers={
+                "X-Phrase-FR": phrase_fr,
+                "X-Phrase-WO": phrase_wo,
+            },
         )
     except Exception as exc:
         raise HTTPException(500, str(exc)) from exc

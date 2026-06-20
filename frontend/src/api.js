@@ -34,3 +34,19 @@ export const detect = (blob, sessionId = 'default') => {
     method: 'POST', body: fd,
   }).then(json)
 }
+
+/** Pipeline MMS : frame → YOLO → NLLB → MMS TTS → WAV.
+ *  Résout en { phraseFr, phraseWo, audioBlob } ou null (204 = rien détecté). */
+export const describe = async (blob, sessionId = 'default') => {
+  const fd = new FormData()
+  fd.append('file', blob, 'frame.jpg')
+  const res = await fetch(`${BASE}/api/v1/describe?session_id=${encodeURIComponent(sessionId)}`, {
+    method: 'POST', body: fd,
+  })
+  if (res.status === 204) return null
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const phraseFr  = res.headers.get('X-Phrase-FR') ?? ''
+  const phraseWo  = res.headers.get('X-Phrase-WO') ?? ''
+  const audioBlob = await res.blob()
+  return { phraseFr, phraseWo, audioBlob }
+}
