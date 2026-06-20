@@ -4,9 +4,12 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 
 from app.audio_registry import AudioRegistry
+from app.nmt_service import WolofTranslator
+from app.tts_service import WolofTTS
+from app.scene_narrator import build_scene_phrase
 from app.schemas import (
     AudioMappingEntry,
     AudioMappingUpdate,
@@ -21,7 +24,9 @@ detection_service = DetectionService(registry)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    detection_service.ensure_model()  # charge YOLO en mémoire au démarrage
+    detection_service.ensure_model()
+    WolofTranslator.get()   # précharge NMT sur GPU
+    WolofTTS.get()          # précharge TTS sur GPU
     yield
 
 
@@ -121,3 +126,30 @@ async def detect_image(
         raise HTTPException(400, str(exc)) from exc
     except Exception as exc:
         raise HTTPException(500, f"Erreur de détection: {exc}") from exc
+
+
+@app.post("/api/v1/describe")
+async def describe_scene(
+    file: UploadFile = File(...),
+    session_id: str = Query(default="default"),
+):
+    """Détecte → génère phrase française → traduit en Wolof → retourne audio WAV."""
+    content = await file.read()
+    if not content:
+        raise HTTPException(400, "Image vide")
+    try:
+        result = detection_service.process_bytes(content, session_id=session_id)
+        phrase_fr = build_scene_phrase(result.detections)
+        if not phrase_fr:
+            return Response(status_code=204)  # rien à dire
+
+        phrase_wo = WolofTranslator.get().translate(phrase_fr)
+        audio_bytes = WolofTTS.get().synthesize(phrase_wo)
+
+        return Response(
+            content=audio_bytes,
+            media_type="audio/wav",
+            headers={"X-Phrase-FR": phrase_fr, "X-Phrase-WO": phrase_wo},
+        )
+    except Exception as exc:
+        raise HTTPException(500, str(exc)) from exc
