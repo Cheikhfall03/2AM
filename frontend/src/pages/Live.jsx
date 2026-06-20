@@ -107,6 +107,7 @@ export default function Live() {
         await videoRef.current.play()
       }
       setCameraOn(true)
+      setAuto(true)
       setError(null)
     } catch (e) {
       setError('Impossible d\'accéder à la caméra. Vérifiez les permissions.')
@@ -157,7 +158,7 @@ export default function Live() {
   /* ── Auto mode ── */
   useEffect(() => {
     if (auto && cameraOn) {
-      intervalRef.current = setInterval(runDetect, 2500)
+      intervalRef.current = setInterval(runDetect, 1500)
     } else {
       clearInterval(intervalRef.current)
     }
