@@ -11,16 +11,40 @@ import './Live.css'
 const SESSION_ID = `session-${Date.now()}`
 const POSITION_LABELS = { left: 'Gauche', center: 'Centre', right: 'Droite' }
 
-function AnnouncementBanner({ announcement, onDismiss }) {
-  const audioRef = useRef(null)
+function AnnouncementBanner({ announcement, onDismiss, audioCtx }) {
+  const sourceRef = useRef(null)
 
   useEffect(() => {
     const url = resolveAudio(announcement)
     if (!url) return
-    const a = new Audio(url)
-    a.play().catch(() => {})
-    return () => { a.pause(); a.src = '' }
-  }, [announcement])
+    let cancelled = false
+
+    async function playAudio() {
+      try {
+        // Méthode 1 : AudioContext (contourne l'autoplay mobile)
+        if (audioCtx?.state !== 'closed') {
+          const res = await fetch(url)
+          const buf = await res.arrayBuffer()
+          if (cancelled) return
+          const decoded = await audioCtx.decodeAudioData(buf)
+          if (cancelled) return
+          if (sourceRef.current) sourceRef.current.disconnect()
+          const src = audioCtx.createBufferSource()
+          src.buffer = decoded
+          src.connect(audioCtx.destination)
+          src.start(0)
+          sourceRef.current = src
+          return
+        }
+      } catch { /* fallback */ }
+      // Méthode 2 : HTMLAudioElement classique
+      const a = new Audio(url)
+      a.play().catch(() => {})
+    }
+
+    playAudio()
+    return () => { cancelled = true; if (sourceRef.current) sourceRef.current.disconnect() }
+  }, [announcement, audioCtx])
 
   if (!announcement) return null
 
@@ -45,7 +69,7 @@ function AnnouncementBanner({ announcement, onDismiss }) {
         {announcement.audio_url && (
           <button
             className="announcement-replay"
-            onClick={() => new Audio(resolveAudio(announcement)).play().catch(() => {})}
+            onClick={() => { const a = new Audio(resolveAudio(announcement)); a.play().catch(() => {}) }}
             aria-label="Rejouer l'annonce"
           >
             <svg viewBox="0 0 20 20" fill="currentColor">
@@ -80,11 +104,15 @@ function DetectionRow({ det }) {
   )
 }
 
+// Silence base64 WAV (1 frame) pour déverrouiller l'audio mobile
+const SILENCE = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA='
+
 export default function Live() {
   const videoRef    = useRef(null)
   const canvasRef   = useRef(null)
   const streamRef   = useRef(null)
   const intervalRef = useRef(null)
+  const audioCtxRef = useRef(null)
 
   const [cameraOn,      setCameraOn]      = useState(false)
   const [auto,          setAuto]          = useState(false)
@@ -94,8 +122,20 @@ export default function Live() {
   const [scene,         setScene]         = useState(null)
   const [error,         setError]         = useState(null)
 
+  /* ── Déverrouillage audio mobile (geste utilisateur requis) ── */
+  const unlockAudio = useCallback(() => {
+    if (audioCtxRef.current) return
+    const ctx = new (window.AudioContext || window.webkitAudioContext)()
+    audioCtxRef.current = ctx
+    // Joue un silence pour débloquer l'autoplay sur iOS/Android
+    const sil = new Audio(SILENCE)
+    sil.play().catch(() => {})
+    if (ctx.state === 'suspended') ctx.resume()
+  }, [])
+
   /* ── Camera ── */
   const startCamera = useCallback(async () => {
+    unlockAudio()
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
@@ -191,6 +231,7 @@ export default function Live() {
       <AnnouncementBanner
         announcement={announcement}
         onDismiss={() => setAnnouncement(null)}
+        audioCtx={audioCtxRef.current}
       />
 
       {/* Camera viewport */}
