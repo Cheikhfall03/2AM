@@ -21,6 +21,7 @@ detection_service = DetectionService(registry)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    detection_service.ensure_model()  # charge YOLO en mémoire au démarrage
     yield
 
 
