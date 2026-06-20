@@ -1,26 +1,28 @@
-"""Florence-2-base — description de scène (~100ms GPU, remplace YOLO)."""
+"""BLIP image captioning — description de scène (~80ms GPU, remplace YOLO).
+Utilise Salesforce/blip-image-captioning-base (224M params, natif transformers 5.x).
+"""
 
 import io
 import torch
 from PIL import Image
-from transformers import AutoProcessor, AutoModelForCausalLM
+from transformers import BlipProcessor, BlipForConditionalGeneration
 
-HF_MODEL = "microsoft/Florence-2-base"
-TASK     = "<DETAILED_CAPTION>"
+HF_MODEL = "Salesforce/blip-image-captioning-base"
 
 
 class FlorenceService:
+    """Gardé sous ce nom pour compatibilité avec scene_narrator.py."""
     _instance = None
 
     def __init__(self):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        dtype = torch.float16 if self.device.type == "cuda" else torch.float32
-        self.processor = AutoProcessor.from_pretrained(HF_MODEL, trust_remote_code=True)
-        self.model = AutoModelForCausalLM.from_pretrained(
-            HF_MODEL, trust_remote_code=True, torch_dtype=dtype
+        self.processor = BlipProcessor.from_pretrained(HF_MODEL)
+        self.model = BlipForConditionalGeneration.from_pretrained(
+            HF_MODEL,
+            dtype=torch.float16 if self.device.type == "cuda" else torch.float32,
         ).to(self.device)
         self.model.eval()
-        print(f"[Florence-2] Chargé sur {self.device.type.upper()}")
+        print(f"[BLIP] Chargé sur {self.device.type.upper()} — captioning ultra-rapide")
 
     @classmethod
     def get(cls) -> "FlorenceService":
@@ -29,19 +31,14 @@ class FlorenceService:
         return cls._instance
 
     def describe(self, image_bytes: bytes) -> str | None:
-        """Retourne une description anglaise de la scène en ~100ms GPU."""
+        """Retourne une description anglaise de la scène en ~80ms GPU."""
         image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-        inputs = self.processor(text=TASK, images=image, return_tensors="pt").to(self.device)
+        inputs = self.processor(image, return_tensors="pt").to(self.device)
         with torch.no_grad():
             ids = self.model.generate(
-                input_ids=inputs["input_ids"],
-                pixel_values=inputs["pixel_values"],
-                max_new_tokens=128,
+                **inputs,
+                max_new_tokens=64,
                 num_beams=3,
             )
-        raw    = self.processor.batch_decode(ids, skip_special_tokens=False)[0]
-        parsed = self.processor.post_process_generation(
-            raw, task=TASK, image_size=(image.width, image.height)
-        )
-        caption = parsed.get(TASK, "").strip()
+        caption = self.processor.decode(ids[0], skip_special_tokens=True).strip()
         return caption or None
