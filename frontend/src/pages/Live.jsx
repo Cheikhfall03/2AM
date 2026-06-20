@@ -155,15 +155,34 @@ export default function Live() {
     }
   }, [detecting, captureFrame])
 
-  /* ── Auto mode ── */
+  /* ── Boucle live : enchaîne les détections sans délai fixe ── */
   useEffect(() => {
-    if (auto && cameraOn) {
-      intervalRef.current = setInterval(runDetect, 1500)
-    } else {
-      clearInterval(intervalRef.current)
+    if (!auto || !cameraOn) return
+    let active = true
+
+    async function loop() {
+      while (active) {
+        const blob = await captureFrame()
+        if (!blob || !active) break
+        try {
+          const result = await detect(blob, SESSION_ID)
+          if (!active) break
+          setDetections(result.detections ?? [])
+          setScene(result.scene ?? null)
+          if (result.announcement) setAnnouncement(result.announcement)
+          setError(null)
+        } catch {
+          if (active) setError('Erreur de détection. Le backend est-il démarré ?')
+          break
+        }
+      }
+      setDetecting(false)
     }
-    return () => clearInterval(intervalRef.current)
-  }, [auto, cameraOn, runDetect])
+
+    setDetecting(true)
+    loop()
+    return () => { active = false }
+  }, [auto, cameraOn, captureFrame])
 
   return (
     <div className="live-page">
