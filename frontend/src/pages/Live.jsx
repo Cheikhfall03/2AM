@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Header from '../components/Header'
 import { audioUrl, detect } from '../api'
+
+function resolveAudio(announcement) {
+  if (!announcement) return null
+  return announcement.audio_url ? audioUrl(announcement.label) : null
+}
 import './Live.css'
 
 const SESSION_ID = `session-${Date.now()}`
@@ -10,8 +15,9 @@ function AnnouncementBanner({ announcement, onDismiss }) {
   const audioRef = useRef(null)
 
   useEffect(() => {
-    if (!announcement?.audio_url) return
-    const a = new Audio(announcement.audio_url)
+    const url = resolveAudio(announcement)
+    if (!url) return
+    const a = new Audio(url)
     a.play().catch(() => {})
     return () => { a.pause(); a.src = '' }
   }, [announcement])
@@ -39,7 +45,7 @@ function AnnouncementBanner({ announcement, onDismiss }) {
         {announcement.audio_url && (
           <button
             className="announcement-replay"
-            onClick={() => new Audio(announcement.audio_url).play().catch(() => {})}
+            onClick={() => new Audio(resolveAudio(announcement)).play().catch(() => {})}
             aria-label="Rejouer l'annonce"
           >
             <svg viewBox="0 0 20 20" fill="currentColor">
