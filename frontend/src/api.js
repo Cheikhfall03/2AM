@@ -45,7 +45,7 @@ export const describe = async (blob, sessionId = 'default') => {
   })
   if (res.status === 204) return null
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  const phraseFr  = res.headers.get('X-Phrase-FR') ?? ''
+  const phraseFr  = res.headers.get('X-Phrase-EN') ?? ''
   const phraseWo  = res.headers.get('X-Phrase-WO') ?? ''
   const audioBlob = await res.blob()
   return { phraseFr, phraseWo, audioBlob }

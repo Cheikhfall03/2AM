@@ -1,14 +1,19 @@
 fastapi>=0.115.0
 uvicorn[standard]>=0.32.0
 python-multipart>=0.0.12
-ultralytics>=8.3.0
-opencv-python-headless>=4.8.0
-numpy>=1.24
 pydantic>=2.0
-# NMT Wolof
-ctranslate2>=4.0.0
+numpy>=1.24
+Pillow>=10.0.0
+# Florence-2 (description de scène, remplace YOLO)
+torch>=2.1.0
 transformers>=4.40.0
+timm>=0.9.0
+einops>=0.7.0
+# NMT Wolof (NLLB-200 CTranslate2 int8)
+ctranslate2>=4.0.0
 sentencepiece>=0.1.99
 # TTS Wolof (Meta MMS — VITS natif Wolof)
-torch>=2.1.0
 soundfile>=0.12.0
+# Détection legacy (endpoint /detect)
+ultralytics>=8.3.0
+opencv-python-headless>=4.8.0

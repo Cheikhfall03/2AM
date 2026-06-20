@@ -27,8 +27,8 @@ class WolofTranslator:
             cls._instance = cls()
         return cls._instance
 
-    def translate(self, text: str) -> str:
-        self.tokenizer.src_lang = "fra_Latn"
+    def translate(self, text: str, src_lang: str = "eng_Latn") -> str:
+        self.tokenizer.src_lang = src_lang
         tokens = self.tokenizer.convert_ids_to_tokens(
             self.tokenizer.encode(text, add_special_tokens=True)
         )
