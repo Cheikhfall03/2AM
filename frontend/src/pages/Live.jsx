@@ -6,23 +6,23 @@ import './Live.css'
 const SESSION_ID = `session-${Date.now()}`
 
 let _currentSource = null
-let _audioPlaying  = false
 
-async function playBlob(ctx, blob) {
+/** Joue le blob audio et attend la fin avant de résoudre la Promise. */
+async function playBlobAndWait(ctx, blob) {
   if (!ctx || ctx.state === 'closed') return
-  if (_audioPlaying) return           // ne pas superposer les sons
-  try {
-    const buf     = await blob.arrayBuffer()
-    const decoded = await ctx.decodeAudioData(buf)
-    if (_currentSource) { try { _currentSource.stop() } catch {} }
-    const src  = ctx.createBufferSource()
-    src.buffer = decoded
-    src.connect(ctx.destination)
-    _audioPlaying  = true
-    src.onended    = () => { _audioPlaying = false }
-    src.start(0)
-    _currentSource = src
-  } catch { _audioPlaying = false }
+  if (_currentSource) { try { _currentSource.stop() } catch {} }
+  return new Promise(async (resolve) => {
+    try {
+      const buf     = await blob.arrayBuffer()
+      const decoded = await ctx.decodeAudioData(buf)
+      const src     = ctx.createBufferSource()
+      src.buffer    = decoded
+      src.connect(ctx.destination)
+      src.onended   = resolve
+      src.start(0)
+      _currentSource = src
+    } catch { resolve() }
+  })
 }
 
 function AnnouncementBanner({ scene, onDismiss }) {
@@ -151,7 +151,7 @@ export default function Live() {
         setScene(result)
         setDetections(result.detections ?? [])
         drawBoxes(result.detections ?? [])
-        playBlob(audioCtxRef.current, result.audioBlob)
+        await playBlobAndWait(audioCtxRef.current, result.audioBlob)
       }
     } catch {
       setError('Erreur de détection. Le backend est-il démarré ?')
@@ -182,7 +182,11 @@ export default function Live() {
             setScene(result)
             setDetections(result.detections ?? [])
             drawBoxes(result.detections ?? [])
-            playBlob(audioCtxRef.current, result.audioBlob)
+            // Attend la fin de l'audio avant la prochaine détection
+            await playBlobAndWait(audioCtxRef.current, result.audioBlob)
+          } else {
+            // Rien détecté → petite pause avant de re-scanner
+            await new Promise(r => setTimeout(r, 500))
           }
           setError(null)
         } catch {
