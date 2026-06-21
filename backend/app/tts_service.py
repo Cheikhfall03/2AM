@@ -5,7 +5,7 @@ import torch
 import soundfile as sf
 from transformers import VitsModel, VitsTokenizer
 
-HF_MODEL    = "facebook/mms-tts-wol"
+HF_MODEL    = "rnjema-unima/mms-tts-wol-baseline"
 SAMPLE_RATE = 16000
 
 
