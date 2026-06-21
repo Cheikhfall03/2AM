@@ -44,11 +44,12 @@ export default function Live() {
   const intervalRef = useRef(null)
   const audioCtxRef = useRef(null)
 
-  const [cameraOn,   setCameraOn]   = useState(false)
-  const [auto,       setAuto]       = useState(false)
-  const [detecting,  setDetecting]  = useState(false)
-  const [scene,      setScene]      = useState(null)  // { phraseFr, phraseWo, audioBlob }
-  const [error,      setError]      = useState(null)
+  const [cameraOn,    setCameraOn]   = useState(false)
+  const [auto,        setAuto]       = useState(false)
+  const [detecting,   setDetecting]  = useState(false)
+  const [scene,       setScene]      = useState(null)
+  const [detections,  setDetections] = useState([])
+  const [error,       setError]      = useState(null)
 
   /* ── Déverrouillage audio mobile (geste utilisateur requis) ── */
   const unlockAudio = useCallback(() => {
@@ -100,8 +101,35 @@ export default function Live() {
     canvas.width  = video.videoWidth
     canvas.height = video.videoHeight
     canvas.getContext('2d').drawImage(video, 0, 0)
-
     return new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', .85))
+  }, [])
+
+  /* ── Dessin des cadres YOLO sur le canvas overlay ── */
+  const overlayRef = useRef(null)
+  const drawBoxes = useCallback((dets) => {
+    const video   = videoRef.current
+    const overlay = overlayRef.current
+    if (!overlay || !video) return
+    overlay.width  = video.videoWidth  || video.clientWidth
+    overlay.height = video.videoHeight || video.clientHeight
+    const ctx = overlay.getContext('2d')
+    ctx.clearRect(0, 0, overlay.width, overlay.height)
+    dets.forEach(d => {
+      if (!d.bbox) return
+      const [x1, y1, x2, y2] = d.bbox
+      const urgent = d.distance_m !== null && d.distance_m <= 1.5
+      ctx.strokeStyle = urgent ? '#ef4444' : '#22c55e'
+      ctx.lineWidth   = 2
+      ctx.strokeRect(x1, y1, x2 - x1, y2 - y1)
+      ctx.fillStyle = urgent ? '#ef4444cc' : '#22c55ecc'
+      ctx.font = 'bold 13px sans-serif'
+      const label = d.distance_m !== null
+        ? `${d.label_fr} ${d.distance_m.toFixed(1)}m`
+        : d.label_fr
+      ctx.fillRect(x1, y1 - 18, ctx.measureText(label).width + 8, 18)
+      ctx.fillStyle = '#fff'
+      ctx.fillText(label, x1 + 4, y1 - 4)
+    })
   }, [])
 
   const runDetect = useCallback(async () => {
@@ -113,6 +141,8 @@ export default function Live() {
       const result = await describe(blob, SESSION_ID)
       if (result) {
         setScene(result)
+        setDetections(result.detections ?? [])
+        drawBoxes(result.detections ?? [])
         playBlob(audioCtxRef.current, result.audioBlob)
       }
     } catch {
@@ -142,6 +172,8 @@ export default function Live() {
           if (!active) break
           if (result) {
             setScene(result)
+            setDetections(result.detections ?? [])
+            drawBoxes(result.detections ?? [])
             playBlob(audioCtxRef.current, result.audioBlob)
           }
           setError(null)
@@ -175,6 +207,7 @@ export default function Live() {
           aria-label="Flux caméra"
         />
         <canvas ref={canvasRef} className="sr-only" aria-hidden />
+        <canvas ref={overlayRef} className="viewport-overlay" aria-hidden />
 
         {!cameraOn && (
           <div className="viewport-placeholder">

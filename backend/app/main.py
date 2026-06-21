@@ -147,12 +147,16 @@ async def describe_scene(
             return Response(status_code=204)
 
         phrase_fr, phrase_wo, audio_bytes = output
+        import json
+        dets_json = json.dumps([d.model_dump() for d in result.detections])
         return Response(
             content=audio_bytes,
             media_type="audio/wav",
             headers={
-                "X-Phrase-FR": phrase_fr,
-                "X-Phrase-WO": phrase_wo,
+                "X-Phrase-FR":   phrase_fr,
+                "X-Phrase-WO":   phrase_wo,
+                "X-Detections":  dets_json,
+                "Access-Control-Expose-Headers": "X-Phrase-FR,X-Phrase-WO,X-Detections",
             },
         )
     except Exception as exc:

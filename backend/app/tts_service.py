@@ -27,10 +27,15 @@ class WolofTTS:
 
     def synthesize(self, text: str) -> bytes:
         """Retourne bytes WAV 16kHz mono en ~50ms sur GPU."""
+        import numpy as np
         inputs = self.tokenizer(text, return_tensors="pt").to(self.device)
         with torch.no_grad():
             output = self.model(**inputs).waveform
         wav = output.squeeze().cpu().float().numpy()
+        # Normalise pour éliminer le bruit et éviter la saturation
+        peak = np.max(np.abs(wav))
+        if peak > 0:
+            wav = wav / peak * 0.95
         buf = io.BytesIO()
         sf.write(buf, wav, samplerate=self.model.config.sampling_rate, format="WAV")
         return buf.getvalue()
