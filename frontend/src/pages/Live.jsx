@@ -5,16 +5,24 @@ import './Live.css'
 
 const SESSION_ID = `session-${Date.now()}`
 
+let _currentSource = null
+let _audioPlaying  = false
+
 async function playBlob(ctx, blob) {
   if (!ctx || ctx.state === 'closed') return
+  if (_audioPlaying) return           // ne pas superposer les sons
   try {
     const buf     = await blob.arrayBuffer()
     const decoded = await ctx.decodeAudioData(buf)
-    const src     = ctx.createBufferSource()
-    src.buffer    = decoded
+    if (_currentSource) { try { _currentSource.stop() } catch {} }
+    const src  = ctx.createBufferSource()
+    src.buffer = decoded
     src.connect(ctx.destination)
+    _audioPlaying  = true
+    src.onended    = () => { _audioPlaying = false }
     src.start(0)
-  } catch { /* audio non jouable — silencieux */ }
+    _currentSource = src
+  } catch { _audioPlaying = false }
 }
 
 function AnnouncementBanner({ scene, onDismiss }) {

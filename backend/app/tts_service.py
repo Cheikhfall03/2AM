@@ -1,11 +1,14 @@
-"""Meta MMS TTS Wolof — synthèse ultra-rapide (~50ms GPU) via VITS."""
+"""Meta MMS TTS Français — synthèse ultra-rapide (~50ms GPU) via VITS.
+Utilise facebook/mms-tts-fra (modèle Meta officiel, qualité studio).
+Le texte Wolof est affiché à l'écran via NLLB, l'audio est en français.
+"""
 
 import io
 import torch
 import soundfile as sf
 from transformers import VitsModel, VitsTokenizer
 
-HF_MODEL    = "rnjema-unima/mms-tts-wol-baseline"
+HF_MODEL    = "facebook/mms-tts-fra"
 SAMPLE_RATE = 16000
 
 

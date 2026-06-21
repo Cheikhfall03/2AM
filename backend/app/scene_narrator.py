@@ -55,5 +55,5 @@ def describe_to_audio(detections: list[DetectionOut]) -> tuple[str, str, bytes] 
     if not phrase_fr:
         return None
     phrase_wo = translate_cached(phrase_fr)
-    audio     = synthesize_cached(phrase_wo)
+    audio     = synthesize_cached(phrase_fr)   # audio en français (qualité Meta)
     return phrase_fr, phrase_wo, audio
